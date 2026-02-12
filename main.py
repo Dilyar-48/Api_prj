@@ -1,5 +1,6 @@
 import os
 import sys
+from to_scale import scale_map
 from PyQt6.QtCore import Qt
 import requests
 from PyQt6.QtGui import QPixmap
@@ -10,14 +11,15 @@ SCREEN_SIZE = [1000, 1000]
 class Example(QWidget):
     def __init__(self):
         super().__init__()
+        self.scale = 0.009
         self.setGeometry(100, 100, *SCREEN_SIZE)
         self.setWindowTitle('Отображение карты')
-        self.inputx = QLineEdit(self)
+        self.inputx = QLineEdit("37.588392", self)
         self.inputx.resize(SCREEN_SIZE[0] - 50, 30)
         self.inputx.move(40, 10)
         self.xlabel = QLabel("<h3>X</h3>", self)
         self.xlabel.move(20, 15)
-        self.inputy = QLineEdit(self)
+        self.inputy = QLineEdit("55.734036", self)
         self.inputy.resize(SCREEN_SIZE[0] - 50, 30)
         self.inputy.move(40, 50)
         self.ylabel = QLabel("<h3>Y</h3>", self)
@@ -27,13 +29,14 @@ class Example(QWidget):
         self.push_btn.move(10, 95)
         self.push_btn.clicked.connect(self.getImage)
         self.image = QLabel(self)
-        self.image.move(10, 105)
+        self.image.move(10, 125)
         self.image.resize(SCREEN_SIZE[0] - 20, SCREEN_SIZE[1] - 130)
+        self.getImage()
 
     def getImage(self):
         server_address = 'https://static-maps.yandex.ru/v1?'
         api_key = 'f3a0fe3a-b07e-4840-a1da-06f18b2ddf13'
-        ll_spn = f'll={self.inputx.text()},{self.inputy.text()}&spn=0.009,0.009'
+        ll_spn = f'll={self.inputx.text()},{self.inputy.text()}&spn={self.scale},{self.scale}'
 
         map_request = f"{server_address}{ll_spn}&apikey={api_key}"
         response = requests.get(map_request)
@@ -54,6 +57,14 @@ class Example(QWidget):
     def closeEvent(self, event):
         """При закрытии формы подчищаем за собой"""
         os.remove(self.map_file)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Up:
+            self.scale = scale_map(self.scale, "+", 100)
+            self.getImage()
+        elif event.key() == Qt.Key.Key_Down:
+            self.scale = scale_map(self.scale, "-", 100)
+            self.getImage()
 
 
 if __name__ == '__main__':
