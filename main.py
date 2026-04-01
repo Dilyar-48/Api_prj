@@ -1,43 +1,66 @@
 import os
+import pprint
 import sys
-from to_scale import scale_map
-from PyQt6.QtCore import Qt
 import requests
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton
-SCREEN_SIZE = [1000, 1000]
+import arcade
+from to_rec import spn_sizes
+from to_scale import scale_map
+from move_map import to_move
+from arcade.gui import UIManager, UIFlatButton
+from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
+
+WINDOW_WIDTH = 1280
+WINDOW_HEIGHT = 720
+WINDOW_TITLE = "MAP"
+MAP_FILE = "map.png"
 
 
-class Example(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.scale = 0.009
-        self.setGeometry(100, 100, *SCREEN_SIZE)
-        self.setWindowTitle('Отображение карты')
-        self.inputx = QLineEdit("37.588392", self)
-        self.inputx.resize(SCREEN_SIZE[0] - 50, 30)
-        self.inputx.move(40, 10)
-        self.xlabel = QLabel("<h3>X</h3>", self)
-        self.xlabel.move(20, 15)
-        self.inputy = QLineEdit("55.734036", self)
-        self.inputy.resize(SCREEN_SIZE[0] - 50, 30)
-        self.inputy.move(40, 50)
-        self.ylabel = QLabel("<h3>Y</h3>", self)
-        self.ylabel.move(20, 55)
-        self.push_btn = QPushButton("Сгенерировать", self)
-        self.push_btn.resize(SCREEN_SIZE[0] - 20, 30)
-        self.push_btn.move(10, 95)
-        self.push_btn.clicked.connect(self.getImage)
-        self.image = QLabel(self)
-        self.image.move(10, 125)
-        self.image.resize(SCREEN_SIZE[0] - 20, SCREEN_SIZE[1] - 130)
-        self.getImage()
+class GameView(arcade.Window):
+    def __init__(self, width, height, title):
+        super().__init__(width, height, title)
+        self.manager = UIManager()
+        self.manager.enable()
+        self.anchor_layout = UIAnchorLayout(x=-310, y=-135)
+        self.box_layout = UIBoxLayout(vertical=False, space_between=10)
+        self.setup_widgets()
+        self.anchor_layout.add(self.box_layout)
+        self.manager.add(self.anchor_layout)
 
-    def getImage(self):
+    def setup_widgets(self):
+        flat_button = UIFlatButton(text="Сменить тему", width=600, height=20)
+        flat_button.on_click = lambda event: self.theme_change()  # Не только лямбду, конечно
+        self.box_layout.add(flat_button)
+
+    def setup(self):
+        self.x, self.y, self.spn = self.get_coords("Казань")
+        self.theme = ""
+        self.get_image()
+
+    def theme_change(self):
+        if self.theme == "": self.theme="&theme=dark"
+        else: self.theme = ""
+        self.get_image()
+
+    def on_draw(self):
+        self.clear()
+        arcade.draw_lbwh_rectangle_filled(
+            0, 0, self.width, self.height, (238, 232, 231)
+        )
+        arcade.draw_texture_rect(
+            self.background,
+            arcade.LBWH(
+                30,
+                (self.height - self.background.height - 30),
+                self.background.width,
+                self.background.height
+            ),
+        )
+        self.manager.draw()
+
+    def get_image(self):
         server_address = 'https://static-maps.yandex.ru/v1?'
         api_key = 'f3a0fe3a-b07e-4840-a1da-06f18b2ddf13'
-        ll_spn = f'll={self.inputx.text()},{self.inputy.text()}&spn={self.scale},{self.scale}'
-
+        ll_spn = f'll={self.x},{self.y}&spn={self.spn},{self.spn}{self.theme}'
         map_request = f"{server_address}{ll_spn}&apikey={api_key}"
         response = requests.get(map_request)
 
@@ -47,28 +70,48 @@ class Example(QWidget):
             print("Http статус:", response.status_code, "(", response.reason, ")")
             sys.exit(1)
 
-        # Запишем полученное изображение в файл.
-        self.map_file = "map.png"
-        with open(self.map_file, "wb") as file:
+        with open(MAP_FILE, "wb") as file:
             file.write(response.content)
-        self.pixmap = QPixmap(self.map_file).scaled(self.image.width(), self.image.height(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        self.image.setPixmap(self.pixmap)
 
-    def closeEvent(self, event):
-        """При закрытии формы подчищаем за собой"""
-        os.remove(self.map_file)
+        self.background = arcade.load_texture(MAP_FILE)
 
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Up:
-            self.scale = scale_map(self.scale, "+", 100)
-            self.getImage()
-        elif event.key() == Qt.Key.Key_Down:
-            self.scale = scale_map(self.scale, "-", 100)
-            self.getImage()
+    def get_coords(self, town):
+        server_address = 'http://geocode-maps.yandex.ru/1.x/?'
+        api_key = '8013b162-6b42-4997-9691-77b7074026e0'
+        geocoder_request = f'{server_address}apikey={api_key}&geocode={town}&format=json'
+        response = requests.get(geocoder_request)
+        if response:
+            json_response = response.json()
+            toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+            return [float(n) for n in toponym["Point"]["pos"].split(" ")] + [spn_sizes(toponym["boundedBy"]["Envelope"])]
+
+        else:
+            print("Ошибка выполнения запроса:")
+            print(geocoder_request)
+            print("Http статус:", response.status_code, "(", response.reason, ")")
+
+    def on_key_press(self, key, modifiers):
+        spn, x, y = self.spn, self.x, self.y
+        if key == arcade.key.PAGEUP:
+            self.spn = scale_map(self.spn, "+")
+        if key == arcade.key.PAGEDOWN:
+            self.spn = scale_map(self.spn, "-")
+        if key == arcade.key.UP:
+            self.x, self.y = to_move(0, 0, 1, 0, self.x, self.y)
+        if key == arcade.key.DOWN:
+            self.x, self.y = to_move(0, 0, 0, 1, self.x, self.y)
+        if key == arcade.key.RIGHT:
+            self.x, self.y = to_move(1, 0, 0, 0, self.x, self.y)
+        if key == arcade.key.LEFT:
+            self.x, self.y = to_move(0, 1, 0, 0, self.x, self.y)
+        if (spn, x, y) != (self.spn, self.x, self.y):
+            self.get_image()
+def main():
+    gameview = GameView(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
+    gameview.setup()
+    arcade.run()
+    os.remove(MAP_FILE)
 
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    ex = Example()
-    ex.show()
-    sys.exit(app.exec())
+if __name__ == "__main__":
+    main()

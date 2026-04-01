@@ -1,10 +1,5 @@
-def scale_map(s, txt, max_s):
-    if txt == "-":
-        s -= 0.0015
-        if s <= 0:
-            s = 0.0015
-    else:
-        if s + 0.0015 <= max_s:
-            s += 0.0015
+def scale_map(s, sign):
+    if sign == "+": s = min((s + s / 2), 90)
+    if sign == "-": s = max((s - s / 2), s / 2)
     return s
 
