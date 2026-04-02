@@ -6,7 +6,7 @@ import arcade
 from to_rec import spn_sizes
 from to_scale import scale_map
 from move_map import to_move
-from arcade.gui import UIManager, UIFlatButton, UIInputText, UILabel
+from arcade.gui import UIManager, UIFlatButton, UIInputText, UILabel, UITextArea
 from arcade.gui.widgets.layout import UIAnchorLayout, UIBoxLayout
 
 WINDOW_WIDTH = 1280
@@ -43,7 +43,12 @@ class GameView(arcade.Window):
         self.box_layout.add(self.label)
         self.box_layout.add(restart_button)
         self.anchor_layout.add(self.box_layout)
+        self.anchor_layout_right = UIAnchorLayout(x=310, y=290)
+        self.label_address = UITextArea(text=" ", font_size=14, width=600, align="center",
+                                        text_color=(62, 70, 121, 255))
+        self.anchor_layout_right.add(self.label_address)
         self.manager.add(self.anchor_layout)
+        self.manager.add(self.anchor_layout_right)
 
     def setup(self):
         self.points = ""
@@ -56,8 +61,10 @@ class GameView(arcade.Window):
         self.get_coords(self.start_town)
 
     def theme_change(self):
-        if self.theme == "": self.theme="&theme=dark"
-        else: self.theme = ""
+        if self.theme == "":
+            self.theme = "&theme=dark"
+        else:
+            self.theme = ""
         self.get_image()
 
     def on_draw(self):
@@ -102,7 +109,10 @@ class GameView(arcade.Window):
         try:
             json_response = response.json()
             toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
-            self.x, self.y, self.spn =  [float(n) for n in toponym["Point"]["pos"].split(" ")] + [spn_sizes(toponym["boundedBy"]["Envelope"])]
+            self.label_address.text = toponym["metaDataProperty"]["GeocoderMetaData"]["AddressDetails"]["Country"][
+                "AddressLine"]
+            self.x, self.y, self.spn = [float(n) for n in toponym["Point"]["pos"].split(" ")] + [
+                spn_sizes(toponym["boundedBy"]["Envelope"])]
             self.points = f"&pt={self.x},{self.y},pm2ntl"
             self.label.text = ""
             self.get_image()
@@ -128,6 +138,8 @@ class GameView(arcade.Window):
             self.get_coords(self.input_text.text)
         if (spn, x, y) != (self.spn, self.x, self.y):
             self.get_image()
+
+
 def main():
     gameview = GameView(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
     gameview.setup()
