@@ -18,16 +18,13 @@ MAP_FILE = "map.png"
 class GameView(arcade.Window):
     def __init__(self, width, height, title):
         super().__init__(width, height, title)
-        self.manager = UIManager()
-        self.manager.enable()
-        self.anchor_layout = UIAnchorLayout(x=-310, y=-135)
-        self.box_layout = UIBoxLayout(vertical=True, space_between=10)
-        self.setup_widgets()
-        self.anchor_layout.add(self.box_layout)
-        self.manager.add(self.anchor_layout)
-        self.points = ""
+        self.start_town = "Казань"
 
     def setup_widgets(self):
+        self.manager = UIManager()
+        self.manager.enable()
+        self.anchor_layout = UIAnchorLayout(x=-310, y=-175)
+        self.box_layout = UIBoxLayout(vertical=True, space_between=10)
         flat_button = UIFlatButton(text="Сменить тему", width=600, height=20)
         flat_button.on_click = lambda event: self.theme_change()
         self.box_layout.add(flat_button)
@@ -41,12 +38,22 @@ class GameView(arcade.Window):
         box.add(flat_button1)
         self.box_layout.add(box)
         self.label = UILabel(text="", font_size=14, width=600, align="left", text_color=(62, 70, 121, 255))
+        restart_button = UIFlatButton(text="Сбросить", width=200, height=30)
+        restart_button.on_click = lambda event: self.restart()
         self.box_layout.add(self.label)
+        self.box_layout.add(restart_button)
+        self.anchor_layout.add(self.box_layout)
+        self.manager.add(self.anchor_layout)
 
     def setup(self):
+        self.points = ""
         self.x, self.y, self.spn = 0, 0, 0
         self.theme = ""
-        self.get_coords("Казань")
+        self.restart()
+
+    def restart(self):
+        self.setup_widgets()
+        self.get_coords(self.start_town)
 
     def theme_change(self):
         if self.theme == "": self.theme="&theme=dark"
